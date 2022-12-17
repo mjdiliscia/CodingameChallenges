@@ -3,12 +3,14 @@
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <assert.h>
 
 using namespace std;
 
 const int MAX_WIDTH = 15;
 const int MAX_HEIGHT = 7;
 constexpr int MAX_TILES = 15*7;
+const int MAX_ACTIONS = 100;
 
 struct Tile {
     int scrapAmount;
@@ -28,16 +30,36 @@ struct RobotTile {
 };
 using RobotTiles = array<RobotTile, MAX_TILES>;
 
+enum class ACTION {
+    MOVE,
+    BUILD,
+    SPAWN,
+    WAIT
+};
+array<char[8], 5> actionToString{"MOVE", "BUILD", "SPAWN", "WAIT"};
+struct Action {
+    ACTION kind;
+    int x, y, targetX, targetY;
+    int amount;
+};
+using Actions = array<Action, MAX_ACTIONS>;
+
 int boardWidth;
 int boardHeight;
 int currentMatter;
 int opponentMatter;
 TileMatrix board;
 RobotTiles ownRobotsTiles;
+int ownRobotTilesNum;
 RobotTiles opponentRobotsTiles;
+int opponentRobotTilesNum;
+Actions nextActions;
+int nextActionsNum;
 
-inline void init();
-inline void updateGameStatus();
+void init();
+void updateGameStatus();
+void calculateOrders();
+void sendOrders();
 
 int main()
 {
@@ -45,15 +67,17 @@ int main()
 
     while (1) {
         updateGameStatus();
-        
+        calculateOrders();
+        sendOrders();
     }
 }
 
-inline void init() {
+void init() {
     cin >> boardWidth >> boardHeight; cin.ignore();
 }
 
-inline void updateGameStatus() {
+void updateGameStatus() {
+    ownRobotTilesNum = opponentRobotTilesNum = 0;
     cin >> currentMatter >> opponentMatter; cin.ignore();
     for (int i = 0; i < boardHeight; i++) {
         for (int j = 0; j < boardWidth; j++) {
@@ -67,7 +91,40 @@ inline void updateGameStatus() {
             cin >> tile.willBeScrapped;
             cin.ignore();
 
-            if (tile.units)
+            assert(tile.units == 0 || tile.owner == -1);
+            if (tile.units > 0) {
+                auto& robotTile = tile.owner == 1 ? ownRobotsTiles[ownRobotTilesNum++] : opponentRobotsTiles[opponentRobotTilesNum++];
+                robotTile.xCoord = j;
+                robotTile.yCoord = i;
+                robotTile.robots = tile.units;
+            }
         }
     }
+}
+
+void calculateOrders() {
+
+}
+
+void sendOrders() {
+    for (int i = 0; i < nextActionsNum; i++) {
+        Action& action = nextActions[i];
+        cout << actionToString[static_cast<int>(action.kind)];
+        switch (action.kind) {
+            case ACTION::MOVE:
+            case ACTION::SPAWN:
+                cout << " " << action.amount;
+        }
+        switch (action.kind) {
+            case ACTION::MOVE:
+            case ACTION::BUILD:
+            case ACTION::SPAWN:
+                cout << " " << action.x << " " << action.y;
+        }
+        if (action.kind == ACTION::MOVE) {
+            cout << " " << action.targetX << " " << action.targetY;
+        }
+        cout << ";"
+    }
+    cout << endl;
 }

@@ -69,6 +69,7 @@ Actions nextActions;
 int nextActionsNum;
 
 minstd_rand randomEngine = minstd_rand(random_device()());
+uniform_int_distribution directionGenerator = uniform_int_distribution(0, 3);
 
 void init();
 void updateGameStatus();
@@ -110,7 +111,7 @@ void updateGameStatus() {
             cin >> tile.willBeScrapped;
             cin.ignore();
 
-            assert(tile.units == 0 || tile.owner == -1);
+            assert(tile.units == 0 || tile.owner != -1);
             if (tile.units > 0) {
                 auto& robotTile = tile.owner == 1 ? ownRobotsTiles[ownRobotTilesNum++] : opponentRobotsTiles[opponentRobotTilesNum++];
                 robotTile.coord = coord(j, i);
@@ -125,11 +126,15 @@ void addAction(Action action) {
 }
 
 void calculateOrders() {
-    for (auto robotTile : ownRobotsTiles)
-        moveByRandomWalk(robotTile);
+    for (int i=0; i < ownRobotTilesNum; i++) {
+        moveByRandomWalk(ownRobotsTiles[i]);
+    }
 }
 
 void sendOrders() {
+    if (nextActionsNum == 0) {
+        cout << "WAIT";
+    }
     for (int i = 0; i < nextActionsNum; i++) {
         Action& action = nextActions[i];
         cout << actionToString[static_cast<int>(action.kind)];
@@ -158,25 +163,15 @@ void moveByRandomWalk(Tile tile, Coord coordinate) {
     moveByRandomWalk(RobotTile{coordinate, tile.units});
 }
 
-int getPoissonNumber(int average) {
-    poisson_distribution<> generator(average);
-    return generator(randomEngine);
-}
-
 void moveByRandomWalk(RobotTile tile) {
-// FUCK ME: "Binomial distribution does not have a closed-form quantile function". Soooo, let's try with a couple of poissons...
-    int remaining = tile.robots;
-    int upAmount = getPoissonNumber(remaining/4.0);
-    remaining -= upAmount;
-    int downAmount = getPoissonNumber(remaining/3.0);
-    remaining -= downAmount;
-    int leftAmount = getPoissonNumber(remaining/2.0);
-    int rightAmount = remaining - leftAmount;
+    int directionAmount[4]{0,0,0,0};
+    for (int i = 0; i < tile.robots; i++) {
+        directionAmount[directionGenerator(randomEngine)]++;
+    }
 
-    if (upAmount > 0) addAction(Action{ACTION::MOVE, upAmount, get<1>(getNeighbor(tile.coord, DIRECTION::UP))});
-    if (downAmount > 0) addAction(Action{ACTION::MOVE, downAmount, get<1>(getNeighbor(tile.coord, DIRECTION::DOWN))});
-    if (leftAmount > 0) addAction(Action{ACTION::MOVE, leftAmount, get<1>(getNeighbor(tile.coord, DIRECTION::LEFT))});
-    if (rightAmount > 0) addAction(Action{ACTION::MOVE, rightAmount, get<1>(getNeighbor(tile.coord, DIRECTION::RIGHT))});
+    for (int i = 0; i < 4; i++) {
+        if (directionAmount[i] > 0) addAction(Action{ACTION::MOVE, directionAmount[i], tile.coord, get<1>(getNeighbor(tile.coord, static_cast<DIRECTION>(i)))});
+    }
 }
 
 Tile& coordTile(Coord coord) {

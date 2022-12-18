@@ -1,12 +1,12 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <array>
 #include <algorithm>
-#include <tuple>
-#include <random>
-#include <chrono>
+#include <array>
 #include <assert.h>
+#include <chrono>
+#include <iostream>
+#include <vector>
+#include <random>
+#include <string>
+#include <tuple>
 
 using namespace std;
 
@@ -56,7 +56,9 @@ enum class ACTION {
     MESSAGE,
     Count
 };
-array<char[8], static_cast<size_t>(ACTION::Count)> actionToString{"MOVE", "BUILD", "SPAWN", "WAIT", "MESSAGE"};
+using ActionStringArray = array<char[8], static_cast<size_t>(ACTION::Count)>;
+ActionStringArray actionToString{"MOVE", "BUILD", "SPAWN", "WAIT", "MESSAGE"};
+
 struct Action {
     ACTION kind;
     int amount;
@@ -92,8 +94,8 @@ void init();
 void updateGameStatus();
 void calculateOrders();
 void sendOrders();
-void moveByRandomWalk(Tile& tile);
-void moveByRandomWalk(RobotTile& tile);
+void moveByRandomWalk(const Tile& tile);
+void moveByRandomWalk(const RobotTile& tile);
 TileRow::iterator coordTile(const Coord& coord);
 tuple<bool, Coord> getNeighbor(const Coord& coord, DIRECTION direction);
 
@@ -215,7 +217,7 @@ void sendOrders() {
     nextActions.clear();
 }
 
-void moveByRandomWalk(Tile& tile) {
+void moveByRandomWalk(const Tile& tile) {
     assert(tile.owner == 1 && tile.units > 0);
 
     int neighborsCount = tile.neighbors.size();
@@ -240,7 +242,7 @@ void moveByRandomWalk(Tile& tile) {
     }
 }
 
-void moveByRandomWalk(RobotTile& tile) {
+void moveByRandomWalk(const RobotTile& tile) {
     moveByRandomWalk(*tile.tile);
 }
 

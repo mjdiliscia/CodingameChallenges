@@ -11,7 +11,7 @@
 using namespace std;
 
 #define PROFILE_START(ID) auto _ID_ = chrono::steady_clock::now()
-#define PROFILE_STOP(ID, MESSAGE) fprintf(stderr, MESSAGE, chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _ID_).count())
+#define PROFILE_STOP(ID, MESSAGE) fprintf(stderr, MESSAGE, chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - _ID_).count())
 
 const int MAX_WIDTH = 15;
 const int MAX_HEIGHT = 7;
@@ -60,6 +60,11 @@ using ActionStringArray = array<char[8], static_cast<size_t>(ACTION::Count)>;
 ActionStringArray actionToString{"MOVE", "BUILD", "SPAWN", "WAIT", "MESSAGE"};
 
 struct Action {
+    static Action move(int amount, Coord pos, Coord target) { return Action{ACTION::MOVE, amount, pos, target}; }
+    static Action build(Coord pos) { return Action{ACTION::BUILD, 0, pos}; }
+    static Action spawn(int amount, Coord pos) { return Action{ACTION::SPAWN, amount, pos}; }
+    static Action wait() { return Action{ACTION::WAIT}; }
+
     ACTION kind;
     int amount;
     Coord pos;
@@ -94,6 +99,7 @@ void init();
 void updateGameStatus();
 void calculateOrders();
 void sendOrders();
+void buildStuff();
 void moveByRandomWalk(const Tile& tile);
 void moveByRandomWalk(const RobotTile& tile);
 TileRow::iterator coordTile(const Coord& coord);
@@ -104,7 +110,7 @@ int main()
     cin.peek();
     PROFILE_START(init);
     init();
-    PROFILE_STOP(init, "Init time: %ldms\n");
+    PROFILE_STOP(init, "Init time: %ldµs\n");
 
     while (1) {
         cin.peek();
@@ -112,7 +118,7 @@ int main()
         updateGameStatus();
         calculateOrders();
         sendOrders();
-        PROFILE_STOP(turn, "Turn time: %ldms\n");
+        PROFILE_STOP(turn, "Turn time: %ldµs\n");
     }
 }
 
@@ -180,17 +186,7 @@ void calculateOrders() {
     for (auto robotsTile : ownRobotsTiles) {
         moveByRandomWalk(robotsTile);
     }
-    int remainingMatter = currentMatter;
-    while (remainingMatter > BUILD_COST) {
-        Coord randomCoord = ownTiles[bigGenerator(randomEngine) % ownTiles.size()]->coord;
-        nextActions.push_back(Action{
-            ACTION::SPAWN,
-            1,
-            randomCoord,
-            randomCoord
-        });
-        remainingMatter -= BUILD_COST;
-    }
+    buildStuff();
 }
 
 void sendOrders() {
@@ -219,6 +215,16 @@ void sendOrders() {
     nextActions.clear();
 }
 
+void buildStuff() {
+    int remainingMatter = currentMatter;
+
+    while (remainingMatter > BUILD_COST) {
+        Coord randomCoord = ownTiles[bigGenerator(randomEngine) % ownTiles.size()]->coord;
+        nextActions.push_back(Action::spawn(1, randomCoord));
+        remainingMatter -= BUILD_COST;
+    }
+}
+
 void moveByRandomWalk(const Tile& tile) {
     assert(tile.owner == 1 && tile.units > 0);
 
@@ -234,12 +240,7 @@ void moveByRandomWalk(const Tile& tile) {
 
     for (auto move : moves) {
         if (get<0>(move) > 0) {
-            nextActions.push_back(Action{
-                ACTION::MOVE,
-                get<0>(move),
-                tile.coord,
-                get<1>(move)
-            });
+            nextActions.push_back(Action::move(get<0>(move), tile.coord, get<1>(move)));
         }
     }
 }

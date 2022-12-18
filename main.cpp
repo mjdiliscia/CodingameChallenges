@@ -101,11 +101,13 @@ tuple<bool, Coord> getNeighbor(const Coord& coord, DIRECTION direction);
 
 int main()
 {
+    cin.peek();
     PROFILE_START(init);
     init();
     PROFILE_STOP(init, "Init time: %ldms\n");
 
     while (1) {
+        cin.peek();
         PROFILE_START(turn);
         updateGameStatus();
         calculateOrders();

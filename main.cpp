@@ -13,6 +13,7 @@ const int MAX_WIDTH = 15;
 const int MAX_HEIGHT = 7;
 constexpr int MAX_TILES = MAX_WIDTH * MAX_HEIGHT;
 const int MAX_ACTIONS = 100;
+const int BUILD_COST = 10;
 
 using Coord = tuple<int, int>;
 int x(Coord coord) { return get<0>(coord); }
@@ -34,6 +35,7 @@ struct Tile {
 };
 using TileRow = vector<Tile>;
 using TileMatrix = vector<TileRow>;
+using TileIterators = vector<TileRow::iterator>;
 
 struct RobotTile {
     RobotTile(TileRow::iterator tile, int robots) : tile(tile), robots(robots) {}
@@ -70,6 +72,7 @@ int opponentMatter;
 TileMatrix board;
 RobotTiles ownRobotsTiles;
 RobotTiles opponentRobotsTiles;
+TileIterators ownTiles;
 Actions nextActions;
 
 minstd_rand randomEngine = minstd_rand(random_device()());
@@ -79,6 +82,7 @@ uniform_int_distribution<int> directionGenerator[4] = {
     uniform_int_distribution(0, 2),
     uniform_int_distribution(0, 3)
 };
+uniform_int_distribution bigGenerator;
 
 void init();
 void updateGameStatus();
@@ -110,12 +114,14 @@ void init() {
     }
     ownRobotsTiles.reserve(MAX_TILES);
     opponentRobotsTiles.reserve(MAX_TILES);
+    ownTiles.reserve(MAX_TILES);
     nextActions.reserve(MAX_ACTIONS);
 }
 
 void updateGameStatus() {
     ownRobotsTiles.clear();
     opponentRobotsTiles.clear();
+    ownTiles.clear();
     cin >> currentMatter >> opponentMatter; cin.ignore();
     for (int i = 0; i < board.size(); i++) {
         for (int j = 0; j < board[i].size(); j++) {
@@ -135,6 +141,9 @@ void updateGameStatus() {
                 RobotTile robotTile(board[i].begin() + j, tile.units);
                 if (tile.owner == 1) ownRobotsTiles.push_back(robotTile);
                 else opponentRobotsTiles.push_back(robotTile);
+            }
+            if (tile.owner == 1) {
+                ownTiles.push_back(board[i].begin() + j);
             }
         }
     }
@@ -158,6 +167,17 @@ void updateGameStatus() {
 void calculateOrders() {
     for (auto robotsTile : ownRobotsTiles) {
         moveByRandomWalk(robotsTile);
+    }
+    int remainingMatter = currentMatter;
+    while (remainingMatter > BUILD_COST) {
+        Coord randomCoord = ownTiles[bigGenerator(randomEngine) % ownTiles.size()]->coord;
+        nextActions.push_back(Action{
+            ACTION::SPAWN,
+            1,
+            randomCoord,
+            randomCoord
+        });
+        remainingMatter -= BUILD_COST;
     }
 }
 

@@ -39,11 +39,13 @@ struct Tile {
 };
 using TileRow = vector<Tile>;
 using TileMatrix = vector<TileRow>;
+using TileIterator = TileRow::iterator;
 using TileIterators = vector<TileRow::iterator>;
+#define GET_TILE_ITERATOR(ROW, COLUMN) (board[ROW].begin() + (COLUMN))
 
 struct RobotTile {
-    RobotTile(TileRow::iterator tile, int robots) : tile(tile), robots(robots) {}
-    TileRow::iterator tile;
+    RobotTile(TileIterator tile, int robots) : tile(tile), robots(robots) {}
+    TileIterator tile;
     int robots;
 };
 using RobotTiles = vector<RobotTile>;
@@ -84,6 +86,7 @@ TileMatrix board;
 RobotTiles ownRobotsTiles;
 RobotTiles opponentRobotsTiles;
 TileIterators ownTiles;
+TileIterators ownRecyclerTiles;
 Actions nextActions;
 
 minstd_rand randomEngine = minstd_rand(random_device()());
@@ -100,10 +103,14 @@ void updateGameStatus();
 void calculateOrders();
 void sendOrders();
 void buildStuff();
+bool tryBuildRecycler();
+Tile* getBestTileForRecycler();
+bool spawnRobotSomewhere();
 void moveByRandomWalk(const Tile& tile);
 void moveByRandomWalk(const RobotTile& tile);
-TileRow::iterator coordTile(const Coord& coord);
+TileIterator coordTile(const Coord& coord);
 tuple<bool, Coord> getNeighbor(const Coord& coord, DIRECTION direction);
+tuple<int, int, int> getTileReachableScrap(Tile& tile);
 
 int main()
 {
@@ -140,6 +147,7 @@ void updateGameStatus() {
     ownRobotsTiles.clear();
     opponentRobotsTiles.clear();
     ownTiles.clear();
+    ownRecyclerTiles.clear();
     cin >> currentMatter >> opponentMatter; cin.ignore();
     for (int i = 0; i < board.size(); i++) {
         for (int j = 0; j < board[i].size(); j++) {
@@ -156,12 +164,13 @@ void updateGameStatus() {
             tile.coord = coord(j, i);
             assert(tile.units == 0 || tile.owner != -1);
             if (tile.units > 0) {
-                RobotTile robotTile(board[i].begin() + j, tile.units);
+                RobotTile robotTile(GET_TILE_ITERATOR(i, j), tile.units);
                 if (tile.owner == 1) ownRobotsTiles.push_back(robotTile);
                 else opponentRobotsTiles.push_back(robotTile);
             }
             if (tile.owner == 1) {
-                ownTiles.push_back(board[i].begin() + j);
+                ownTiles.push_back(GET_TILE_ITERATOR(i, j));
+                if (tile.recycler == 1) ownRecyclerTiles.push_back(GET_TILE_ITERATOR(i, j));
             }
         }
     }
@@ -174,7 +183,7 @@ void updateGameStatus() {
             for (int d = 0; d < static_cast<int>(DIRECTION::Count); d++) {
                 DIRECTION direction = static_cast<DIRECTION>(d);
                 auto [valid, coord] = getNeighbor(tile.coord, direction);
-                if (valid) {
+                if (valid && coordTile(coord)->recycler == 0) {
                     tile.neighbors.push_back(coordTile(coord));
                 }
             }
@@ -219,10 +228,54 @@ void buildStuff() {
     int remainingMatter = currentMatter;
 
     while (remainingMatter > BUILD_COST) {
-        Coord randomCoord = ownTiles[bigGenerator(randomEngine) % ownTiles.size()]->coord;
-        nextActions.push_back(Action::spawn(1, randomCoord));
-        remainingMatter -= BUILD_COST;
+        bool RecyclerBuilt = tryBuildRecycler();
+        bool robotBuilt = RecyclerBuilt ? false : spawnRobotSomewhere();
+
+        remainingMatter -= RecyclerBuilt || robotBuilt ? BUILD_COST : 0;
     }
+}
+
+bool tryBuildRecycler() {
+    if (ownRecyclerTiles.size() >= ownTiles.size() / 20) return false;
+
+    if (Tile* bestTileForRecycler = getBestTileForRecycler()) {
+        nextActions.push_back(Action::build(bestTileForRecycler->coord));
+        return true;
+    }
+    
+    return false;
+}
+
+Tile* getBestTileForRecycler() {
+    Tile* bestTile = nullptr;
+
+    int bestTileValue = 0;
+    for (auto tile : ownTiles) {
+        if (tile->units == 0) {
+            auto [own, opponent, free] = getTileReachableScrap(*tile);
+            if (opponent+free > bestTileValue) {
+                bestTileValue = opponent+free;
+                bestTile = &*tile;
+            }
+        }
+    }
+
+    return bestTile;
+}
+
+bool spawnRobotSomewhere() {
+    if (ownRecyclerTiles.size() == ownTiles.size()) return false;
+
+    Coord randomCoord;
+    bool freeTile;
+    do {
+        auto tile = ownTiles[bigGenerator(randomEngine) % ownTiles.size()];
+        if ((freeTile = tile->recycler == 0))
+            randomCoord = tile->coord;
+    }while(!freeTile);
+
+    nextActions.push_back(Action::spawn(1, randomCoord));
+    return true;
 }
 
 void moveByRandomWalk(const Tile& tile) {
@@ -249,8 +302,8 @@ void moveByRandomWalk(const RobotTile& tile) {
     moveByRandomWalk(*tile.tile);
 }
 
-TileRow::iterator coordTile(const Coord& coord) {
-    return board[y(coord)].begin() + x(coord);
+TileIterator coordTile(const Coord& coord) {
+    return GET_TILE_ITERATOR(y(coord), x(coord));
 }
 
 #define BORDER_MOVE(v, c, m) if (v != c) { v += m; differentCoord = true; }
@@ -272,4 +325,45 @@ tuple<bool, Coord> getNeighbor(const Coord& coordinate, DIRECTION direction) {
         default: ;
     }
     return make_tuple(differentCoord, coord(x, y));
+}
+
+tuple<int, int, int> getTileReachableScrap(Tile& tile) {
+    int own = 0;
+    int opponent = 0;
+    int free = 0;
+
+    switch(tile.owner) {
+        case 1:
+            own += tile.scrapAmount;
+            break;
+        case 0:
+            free += tile.scrapAmount;
+            break;
+        case -1:
+            opponent += tile.scrapAmount;
+            break;
+        default: ;
+    }
+
+    for (int d=0; d < static_cast<int>(DIRECTION::Count); d++) {
+        DIRECTION direction = static_cast<DIRECTION>(d);
+        auto neighborCoord = getNeighbor(tile.coord, direction);
+        if (get<0>(neighborCoord)) {
+            TileIterator tileIter = coordTile(get<1>(neighborCoord));
+            switch(tileIter->owner) {
+                case 1:
+                    own += tileIter->scrapAmount;
+                    break;
+                case 0:
+                    free += tileIter->scrapAmount;
+                    break;
+                case -1:
+                    opponent += tileIter->scrapAmount;
+                    break;
+                default: ;
+            }
+        }        
+    }
+
+    return make_tuple(own, opponent, free);
 }

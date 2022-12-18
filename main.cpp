@@ -5,9 +5,13 @@
 #include <algorithm>
 #include <tuple>
 #include <random>
+#include <chrono>
 #include <assert.h>
 
 using namespace std;
+
+#define PROFILE_START auto _timestamp_ = chrono::steady_clock::now()
+#define PROFILE_STOP(MESSAGE) fprintf(stderr, MESSAGE, chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _timestamp_).count())
 
 const int MAX_WIDTH = 15;
 const int MAX_HEIGHT = 7;
@@ -105,6 +109,8 @@ int main()
 }
 
 void init() {
+    PROFILE_START;
+
     cin >> boardWidth >> boardHeight; cin.ignore();
     board.reserve(boardHeight);
     board.resize(boardHeight);
@@ -116,6 +122,8 @@ void init() {
     opponentRobotsTiles.reserve(MAX_TILES);
     ownTiles.reserve(MAX_TILES);
     nextActions.reserve(MAX_ACTIONS);
+
+    PROFILE_STOP("Init time: %ldms\n");
 }
 
 void updateGameStatus() {

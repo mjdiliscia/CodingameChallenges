@@ -10,8 +10,8 @@
 
 using namespace std;
 
-#define PROFILE_START auto _timestamp_ = chrono::steady_clock::now()
-#define PROFILE_STOP(MESSAGE) fprintf(stderr, MESSAGE, chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _timestamp_).count())
+#define PROFILE_START(ID) auto _ID_ = chrono::steady_clock::now()
+#define PROFILE_STOP(ID, MESSAGE) fprintf(stderr, MESSAGE, chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - _ID_).count())
 
 const int MAX_WIDTH = 15;
 const int MAX_HEIGHT = 7;
@@ -99,18 +99,20 @@ tuple<bool, Coord> getNeighbor(const Coord& coord, DIRECTION direction);
 
 int main()
 {
+    PROFILE_START(init);
     init();
+    PROFILE_STOP(init, "Init time: %ldms\n");
 
     while (1) {
+        PROFILE_START(turn);
         updateGameStatus();
         calculateOrders();
         sendOrders();
+        PROFILE_STOP(turn, "Turn time: %ldms\n");
     }
 }
 
 void init() {
-    PROFILE_START;
-
     cin >> boardWidth >> boardHeight; cin.ignore();
     board.reserve(boardHeight);
     board.resize(boardHeight);
@@ -122,8 +124,6 @@ void init() {
     opponentRobotsTiles.reserve(MAX_TILES);
     ownTiles.reserve(MAX_TILES);
     nextActions.reserve(MAX_ACTIONS);
-
-    PROFILE_STOP("Init time: %ldms\n");
 }
 
 void updateGameStatus() {

@@ -10,7 +10,7 @@
 
 namespace Settings {
     const int freeTileWeight = 4;
-    const int opponentTileWeight = 9;
+    const int opponentTileWeight = 32;
     const int ownTileWeight = 2;
 
     const int tilesPerTower = 20;

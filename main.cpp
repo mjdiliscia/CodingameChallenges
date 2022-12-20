@@ -13,6 +13,10 @@ namespace Settings {
     const int opponentTileWeight = 32;
     const int ownTileWeight = 2;
 
+    const float freeTileScrapWeight = 1;
+    const float opponentTileScrapWeight = 1.5;
+    const float ownTileScrapWeight = -1;
+
     const int tilesPerTower = 20;
 }
 
@@ -101,7 +105,7 @@ minstd_rand randomEngine = minstd_rand(random_device()());
 uniform_int_distribution<int> uniformGenerator;
 
 const int moveNeighborWeights[3] = { Settings::freeTileWeight, Settings::opponentTileWeight, Settings::ownTileWeight };
-constexpr int maxMoveNeighborWeightsSum = *max_element(begin(moveNeighborWeights), end(moveNeighborWeights)) * 4;
+const int maxMoveNeighborWeightsSum = *max_element(begin(moveNeighborWeights), end(moveNeighborWeights)) * 4;
 
 void init();
 void updateGameStatus();
@@ -255,12 +259,13 @@ bool tryBuildRecycler() {
 Tile* getBestTileForRecycler() {
     Tile* bestTile = nullptr;
 
-    int bestTileValue = 0;
+    float bestTileValue = 0;
     for (auto tile : ownTiles) {
         if (tile->units == 0) {
-            auto [own, opponent, free] = getTileReachableScrap(*tile);
-            if (opponent+free > bestTileValue) {
-                bestTileValue = opponent+free;
+            auto [free, opponent, own] = getTileReachableScrap(*tile);
+            float currentTileValue = free * Settings::freeTileScrapWeight + opponent * Settings::opponentTileScrapWeight + own * Settings::ownTileScrapWeight;
+            if (currentTileValue > bestTileValue) {
+                bestTileValue = currentTileValue;
                 bestTile = &*tile;
             }
         }
@@ -371,7 +376,7 @@ tuple<int, int, int> getTileReachableScrap(Tile& tile) {
         }        
     }
 
-    return make_tuple(own, opponent, free);
+    return make_tuple(free, opponent, own);
 }
 
 vector<int>& getWeigthedNeighbors(const Tile& tile) {

@@ -8,6 +8,14 @@
 #include <string>
 #include <tuple>
 
+namespace Settings {
+    const int freeTileWeight = 4;
+    const int opponentTileWeight = 9;
+    const int ownTileWeight = 2;
+
+    const int tilesPerTower = 20;
+}
+
 using namespace std;
 
 #define PROFILE_START(ID) auto _ID_ = chrono::steady_clock::now()
@@ -90,13 +98,10 @@ TileIterators ownRecyclerTiles;
 Actions nextActions;
 
 minstd_rand randomEngine = minstd_rand(random_device()());
-uniform_int_distribution<int> directionGenerator[4] = {
-    uniform_int_distribution(0, 0),
-    uniform_int_distribution(0, 1),
-    uniform_int_distribution(0, 2),
-    uniform_int_distribution(0, 3)
-};
-uniform_int_distribution bigGenerator;
+uniform_int_distribution<int> uniformGenerator;
+
+const int moveNeighborWeights[3] = { Settings::freeTileWeight, Settings::opponentTileWeight, Settings::ownTileWeight };
+constexpr int maxMoveNeighborWeightsSum = *max_element(begin(moveNeighborWeights), end(moveNeighborWeights)) * 4;
 
 void init();
 void updateGameStatus();
@@ -111,6 +116,7 @@ void moveByRandomWalk(const RobotTile& tile);
 TileIterator coordTile(const Coord& coord);
 tuple<bool, Coord> getNeighbor(const Coord& coord, DIRECTION direction);
 tuple<int, int, int> getTileReachableScrap(Tile& tile);
+vector<int>& getWeigthedNeighbors(const Tile& tile);
 
 int main()
 {
@@ -236,7 +242,7 @@ void buildStuff() {
 }
 
 bool tryBuildRecycler() {
-    if (ownRecyclerTiles.size() >= ownTiles.size() / 20) return false;
+    if (ownRecyclerTiles.size() >= ownTiles.size() / Settings::tilesPerTower) return false;
 
     if (Tile* bestTileForRecycler = getBestTileForRecycler()) {
         nextActions.push_back(Action::build(bestTileForRecycler->coord));
@@ -269,7 +275,7 @@ bool spawnRobotSomewhere() {
     Coord randomCoord;
     bool freeTile;
     do {
-        auto tile = ownTiles[bigGenerator(randomEngine) % ownTiles.size()];
+        auto tile = ownTiles[uniformGenerator(randomEngine) % ownTiles.size()];
         if ((freeTile = tile->recycler == 0))
             randomCoord = tile->coord;
     }while(!freeTile);
@@ -281,11 +287,11 @@ bool spawnRobotSomewhere() {
 void moveByRandomWalk(const Tile& tile) {
     assert(tile.owner == 1 && tile.units > 0);
 
-    int neighborsCount = tile.neighbors.size();
+    auto weigthedNeighbors = getWeigthedNeighbors(tile);
     vector<tuple<int, Coord>> moves;
-    moves.resize(neighborsCount);
+    moves.resize(tile.neighbors.size());
     for (int i = 0; i < tile.units; i++) {
-        int neighborNum = directionGenerator[neighborsCount-1](randomEngine);
+        int neighborNum = weigthedNeighbors[uniformGenerator(randomEngine) % weigthedNeighbors.size()];
         auto& move = moves[neighborNum];
         get<0>(move)++;
         get<1>(move) = tile.neighbors[neighborNum]->coord;
@@ -366,4 +372,17 @@ tuple<int, int, int> getTileReachableScrap(Tile& tile) {
     }
 
     return make_tuple(own, opponent, free);
+}
+
+vector<int>& getWeigthedNeighbors(const Tile& tile) {
+    static vector<int> weightedNeighbors;
+    weightedNeighbors.reserve(maxMoveNeighborWeightsSum);
+    weightedNeighbors.clear();
+    
+    for(int i = 0; i < tile.neighbors.size(); i++) {
+        auto& neighbor = tile.neighbors[i];
+        weightedNeighbors.insert(end(weightedNeighbors), moveNeighborWeights[neighbor->owner+1], i);
+    }
+
+    return weightedNeighbors;
 }

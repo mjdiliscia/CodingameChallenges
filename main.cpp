@@ -237,7 +237,7 @@ void sendOrders() {
 void buildStuff() {
     int remainingMatter = currentMatter;
 
-    while (remainingMatter > BUILD_COST) {
+    while (remainingMatter >= BUILD_COST) {
         bool RecyclerBuilt = tryBuildRecycler();
         bool robotBuilt = RecyclerBuilt ? false : spawnRobotSomewhere();
 

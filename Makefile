@@ -1,10 +1,10 @@
-all: kotg ss
+all: build/kotg build/ss
 
-kotg: keepOffTheGrass.cpp
+build/kotg: keepOffTheGrass.cpp
 	mkdir -p build
 	clang++ keepOffTheGrass.cpp -o build/kotg
 
-ss: seabedSecurity.cpp
+build/ss: seabedSecurity.cpp
 	mkdir -p build
 	clang++ seabedSecurity.cpp -o build/ss
 

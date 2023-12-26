@@ -3,10 +3,10 @@
 #include <cmath>
 #include <iostream>
 #include <map>
-#include <string>
-#include <vector>
 #include <set>
 #include <sstream>
+#include <string>
+#include <vector>
 
 using namespace std;
 
@@ -15,16 +15,12 @@ const int FLEE_DISTANCE = 800;
 const int DARK_DISTANCE = 2000;
 const float DRIFT_RATIO = 0.1f;
 
-#define forn(VAR, LIMIT) for (int VAR = 0; VAR < LIMIT; VAR++)
-#define fori(LIMIT) forn(i, LIMIT)
+#define FORN(VAR, LIMIT) for (int VAR = 0; VAR < LIMIT; VAR++)
+#define FORI(LIMIT) FORN(i, LIMIT)
 
-/**
- * Score points by scanning valuable fish faster than your opponent.
- **/
-// using IntVec = vector<int>;
 using IntSet = set<int>;
 
-enum class Color : int { ENEMY = -1, PINK, YELLOW, GREEN, BLLUE };
+enum class Color : int { ENEMY = -1, PINK, YELLOW, GREEN, BLUE };
 
 enum class Type : int { ENEMY = -1, OCTUPUS, FISH, CRAB };
 
@@ -100,7 +96,7 @@ GameConfig parseConfig() {
     int creatureCount;
     cin >> creatureCount;
     cin.ignore();
-    fori(creatureCount) {
+    FORI(creatureCount) {
         Creature creature;
         cin >> creature.id >> reinterpret_cast<int &>(creature.color) >> reinterpret_cast<int &>(creature.type);
         cin.ignore();
@@ -119,7 +115,7 @@ IntSet parseScans() {
     int scanCount;
     cin >> scanCount;
     cin.ignore();
-    fori(scanCount) {
+    FORI(scanCount) {
         int id;
         cin >> id;
         cin.ignore();
@@ -129,11 +125,11 @@ IntSet parseScans() {
     return scans;
 }
 
-DroneStateVec parseDrones(DroneStateVec &drones) {
+void parseDrones(DroneStateVec &drones) {
     int droneCount;
     cin >> droneCount;
     cin.ignore();
-    fori(droneCount) {
+    FORI(droneCount) {
         DroneState drone;
         cin >> drone.id >> drone.position.x >> drone.position.y >> drone.emergency >> drone.battery;
         cin.ignore();
@@ -148,15 +144,13 @@ DroneStateVec parseDrones(DroneStateVec &drones) {
             drones.push_back(drone);
         }
     }
-
-    return drones;
 }
 
 void fillDroneScans(DroneStateVec &drones) {
     int scanCount;
     cin >> scanCount;
     cin.ignore();
-    fori(scanCount) {
+    FORI(scanCount) {
         int droneId, creatureId;
         cin >> droneId >> creatureId;
         cin.ignore();
@@ -175,7 +169,7 @@ void fillVisibleCreatures(GameState &state, GameConfig &config) {
     int visibleCreatureCount;
     cin >> visibleCreatureCount;
     cin.ignore();
-    fori(visibleCreatureCount) {
+    FORI(visibleCreatureCount) {
         CreatureState creatureState;
         cin >> creatureState.id;
         cin >> creatureState.position.x >> creatureState.position.y;
@@ -214,18 +208,18 @@ string getName(Quadrant quadrant) {
     }
 }
 
-void fillDroneRadars(GameState &state) {
+void fillDroneRadars(DroneStateVec drones) {
     int blipCount;
     cin >> blipCount;
     cin.ignore();
-    fori(blipCount) {
+    FORI(blipCount) {
         int droneId;
         int creatureId;
         string radar;
         cin >> droneId >> creatureId >> radar;
         cin.ignore();
-        auto droneIter = find_if(state.own.drones.begin(), state.own.drones.end(),
-                                 [droneId](DroneState drone) { return drone.id == droneId; });
+        auto droneIter =
+            find_if(drones.begin(), drones.end(), [droneId](DroneState drone) { return drone.id == droneId; });
         droneIter->bleeps[getQuadrant(radar)].insert(creatureId);
     }
 }
@@ -235,13 +229,14 @@ GameState parseGameState(GameState &state, GameConfig &config) {
     cin.ignore();
     cin >> state.foe.score;
     cin.ignore();
+
     state.own.totalScans = parseScans();
     state.foe.totalScans = parseScans();
     parseDrones(state.own.drones);
     parseDrones(state.foe.drones);
     fillDroneScans(state.own.drones);
     fillVisibleCreatures(state, config);
-    fillDroneRadars(state);
+    fillDroneRadars(state.own.drones);
 
     return state;
 }
@@ -259,10 +254,10 @@ void calculateRemainingCreatures(PlayerState &state, GameConfig &config) {
             state.remainingCreatures.insert(creature.id);
 }
 
-void resetDroneTargets(GameState &state) {
-    for (auto &drone : state.own.drones)
+void resetDroneTargets(PlayerState &state) {
+    for (auto &drone : state.drones)
         if (drone.currentTargetType == TargetType::CREATURE)
-            if (state.own.totalScans.count(drone.currentTarget) || drone.currentScans.count(drone.currentTarget))
+            if (state.totalScans.count(drone.currentTarget) || drone.currentScans.count(drone.currentTarget))
                 drone.currentTargetType = TargetType::NONE;
 }
 
@@ -360,21 +355,21 @@ IntSet getFilteredCreaturesInCuadrant(IntSet &filter, IntSet &creatures) {
     return filteredCreatures;
 }
 
-void findNewTargetsByRadar(GameState &state) {
-    for (auto &drone : state.own.drones) {
+void findNewTargetsByRadar(PlayerState &state, CreatureStateSet &visibleEnemies) {
+    for (auto &drone : state.drones) {
         if (drone.currentTargetType == TargetType::NONE && drone.position.y > 500)
             continue;
 
         drone.currentTargetType = TargetType::NONE;
         double maxDensity = 0;
         for (auto &quadrant : drone.bleeps) {
-            if (isAnyCreatureInRange(getCreaturesInQuadrant(quadrant.first, drone, state.visibleEnemies),
-                                     drone.position, AVOID_DISTANCE)) {
+            if (isAnyCreatureInRange(getCreaturesInQuadrant(quadrant.first, drone, visibleEnemies), drone.position,
+                                     AVOID_DISTANCE)) {
                 cerr << "Avoiding quadrant " << getName(quadrant.first) << " for " << drone.id << endl;
                 continue;
             }
 
-            IntSet remainingInQuadrant = getFilteredCreaturesInCuadrant(state.own.remainingCreatures, quadrant.second);
+            IntSet remainingInQuadrant = getFilteredCreaturesInCuadrant(state.remainingCreatures, quadrant.second);
             double density = getDensity(drone.position, quadrant.first, remainingInQuadrant.size());
             if (maxDensity < density) {
                 maxDensity = density;
@@ -383,7 +378,7 @@ void findNewTargetsByRadar(GameState &state) {
             }
         }
 
-        if (isAnyCreatureInRange(state.visibleEnemies, drone.position, FLEE_DISTANCE))
+        if (isAnyCreatureInRange(visibleEnemies, drone.position, FLEE_DISTANCE))
             drone.currentTargetType = TargetType::NONE;
     }
 }
@@ -462,8 +457,8 @@ int main() {
         parseGameState(state, config);
         calculateRemainingCreatures(state.own, config);
 
-        resetDroneTargets(state);
-        findNewTargetsByRadar(state);
+        resetDroneTargets(state.own);
+        findNewTargetsByRadar(state.own, state.visibleEnemies);
         sendDroneCommands(state);
     }
 }

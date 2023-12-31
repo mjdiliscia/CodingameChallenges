@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iostream>
 #include <algorithm>
+#include <istream>
 
 #include "states.hpp"
 #include "drone.hpp"
@@ -64,22 +65,6 @@ void PlayerState::parseScans(istream& in) {
         in >> id;
         in.ignore();
         totalScans.insert(id);
-    }
-}
-
-void PlayerState::parseDronesScans(istream& in) {
-    int scanCount;
-    in >> scanCount;
-    in.ignore();
-
-    FORI(scanCount) {
-        int droneId, creatureId;
-        in >> droneId >> creatureId;
-        in.ignore();
-
-        auto droneIter = getDroneState(droneId);
-        assert (droneIter != drones.end());
-        droneIter->currentScans.insert(creatureId);
     }
 }
 
@@ -149,9 +134,28 @@ void GameState::parseInput(istream& in) {
     foe.parseScans(in);
     own.parseDrones(in);
     foe.parseDrones(in);
-    own.parseDronesScans(in);
+    parseDronesScans(in);
     parseVisibleEntities(in);
     own.parseDronesRadar(in);
+}
+
+void GameState::parseDronesScans(istream& in) {
+    int scanCount;
+    in >> scanCount;
+    in.ignore();
+
+    FORI(scanCount) {
+        int droneId, creatureId;
+        in >> droneId >> creatureId;
+        in.ignore();
+
+        auto droneIter = own.getDroneState(droneId);
+        if (droneIter == own.drones.end()) {
+            droneIter = foe.getDroneState(droneId);
+            assert (droneIter != foe.drones.end());
+        }
+        droneIter->currentScans.insert(creatureId);
+    }
 }
 
 void GameState::parseVisibleEntities(istream& in) {

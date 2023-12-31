@@ -1,7 +1,6 @@
 #include <cassert>
 #include <iostream>
 #include <algorithm>
-#include <memory>
 
 #include "states.hpp"
 #include "drone.hpp"
@@ -46,11 +45,11 @@ void PlayerState::parseDrones(istream& in) {
         in >> droneId;
         auto droneIter = getDroneState(droneId);
         if (droneIter != drones.end()) {
+            droneIter->parseInput(in);
+        } else {
             DroneState drone(droneId);
             drone.parseInput(in);
             drones.push_back(drone);
-        } else {
-            droneIter->parseInput(in);
         }
     }
 }

@@ -14,6 +14,7 @@ const int MAX_SCANS = 6;
 
 #define FORN(VAR, LIMIT) for (int VAR = 0; VAR < LIMIT; VAR++)
 #define FORI(LIMIT) FORN(i, LIMIT)
+#define assertm(exp, msg) assert(((void)msg, exp))
 
 using IntSet = set<int>;
 

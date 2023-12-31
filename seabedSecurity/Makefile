@@ -14,5 +14,5 @@ build/%.o: %.cpp build
 
 build/seabedSecurity: $(objects)
 	clang++ $^ -o build/seabedSecurity
-	codingame-merge -o build/seabedSecurity
+	codingame-merge -o build/seabedSecurity.cpp
 

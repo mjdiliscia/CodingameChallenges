@@ -1,6 +1,18 @@
-all: build/ss
+CC=clang
+CXX=clang++
 
-build/ss: main.cpp
+sources := $(wildcard *.cpp)
+objects := $(patsubst %.cpp,build/%.o,$(sources))
+
+all: build/seabedSecurity
+
+build:
 	mkdir -p build
-	clang++ main.cpp -o build/ss
+
+build/%.o: %.cpp build
+	$(CXX) -c $< -o $@
+
+build/seabedSecurity: $(objects)
+	clang++ $^ -o build/seabedSecurity
+	codingame-merge -o build/seabedSecurity
 
